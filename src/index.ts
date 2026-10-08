@@ -9,10 +9,9 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// 1. Recrear la base de datos con el campo 'empresa'
+// Crear la tabla solo si no existe (los datos persisten entre reinicios)
 pool.query(`
-  DROP TABLE IF EXISTS contactos;
-  CREATE TABLE contactos (
+  CREATE TABLE IF NOT EXISTS contactos (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     empresa VARCHAR(100),
@@ -21,7 +20,7 @@ pool.query(`
     notas TEXT,
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
-`).then(() => console.log('✅ Tabla recreada con el campo empresa')).catch(console.error);
+`).then(() => console.log('✅ Tabla contactos lista')).catch(console.error);
 
 // Función auxiliar para validar correos
 const esEmailValido = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
