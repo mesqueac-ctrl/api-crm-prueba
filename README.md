@@ -29,7 +29,7 @@ API REST para gestionar contactos de clientes de un CRM, hecha con Node.js, Expr
    ```bash
    npm run dev
    ```
-   La API queda en `http://localhost:3000`. Para detener la base de datos: `docker compose down` (agrega `-v` para borrar también los datos).
+   La API queda en `http://localhost:3000`. Otros scripts: `npm start` (sin recarga automática), `npm run typecheck` (verifica tipos) y `npm run build` (compila a `dist/`). Para detener la base de datos: `docker compose down` (agrega `-v` para borrar también los datos).
 
 ## Endpoints
 
@@ -97,7 +97,6 @@ curl -X DELETE http://localhost:3000/api/contactos/1
 - Pruebas automatizadas (por ejemplo Vitest + Supertest) con una base de datos de prueba.
 - Paginación en el listado.
 - Migraciones, y separar rutas, controladores y validación en archivos distintos (hoy todo está en `src/index.ts`).
-- Arreglar la configuración de `tsconfig.json`: `npx tsc --noEmit` reporta errores de módulos (ESM vs CommonJS). No afecta la ejecución con `tsx`.
 - Tabla de notas, `PUT` para editar contactos y un manejador de errores centralizado.
 
 ## Uso de IA
