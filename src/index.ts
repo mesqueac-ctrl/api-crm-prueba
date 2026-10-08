@@ -23,23 +23,43 @@ pool.query(`
 `).then(() => console.log('✅ Tabla contactos lista')).catch(console.error);
 
 // Función auxiliar para validar correos
-const esEmailValido = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const esEmailValido = (email: unknown) =>
+  typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+// Un campo opcional debe ser texto (o no venir) y respetar la longitud de la columna
+const textoOpcionalValido = (valor: unknown, max: number) =>
+  valor === undefined || valor === null || (typeof valor === 'string' && valor.length <= max);
+
+// El id debe ser un entero positivo; si no, Postgres lanzaría un error de tipo (500)
+const esIdValido = (id: string) => /^\d+$/.test(id) && Number(id) <= 2147483647;
+
+// Valida el parámetro :id en todas las rutas que lo usan
+app.param('id', (req, res, next, id) => {
+  if (!esIdValido(id)) return res.status(400).json({ error: 'El id debe ser un número entero positivo' });
+  next();
+});
 
 // REQ 1 & 5: Crear contacto con validaciones
 app.post('/api/contactos', async (req, res): Promise<any> => {
-  const { nombre, email, telefono, empresa } = req.body;
-  
-  if (!nombre) return res.status(400).json({ error: 'El nombre es obligatorio' });
-  if (!email || !esEmailValido(email)) return res.status(400).json({ error: 'Formato de correo inválido' });
+  const { nombre, email, telefono, empresa } = req.body ?? {};
+
+  if (typeof nombre !== 'string' || nombre.trim() === '') {
+    return res.status(400).json({ error: 'El nombre es obligatorio' });
+  }
+  if (nombre.length > 100) return res.status(400).json({ error: 'El nombre no puede superar 100 caracteres' });
+  if (!esEmailValido(email)) return res.status(400).json({ error: 'Formato de correo inválido' });
+  if (email.length > 100) return res.status(400).json({ error: 'El correo no puede superar 100 caracteres' });
+  if (!textoOpcionalValido(telefono, 20)) return res.status(400).json({ error: 'El teléfono debe ser texto de máximo 20 caracteres' });
+  if (!textoOpcionalValido(empresa, 100)) return res.status(400).json({ error: 'La empresa debe ser texto de máximo 100 caracteres' });
 
   try {
     const result = await pool.query(
       'INSERT INTO contactos (nombre, email, telefono, empresa) VALUES ($1, $2, $3, $4) RETURNING *',
-      [nombre, email, telefono, empresa]
+      [nombre.trim(), email, telefono ?? null, empresa ?? null]
     );
     res.status(201).json(result.rows[0]);
   } catch (err: any) {
-    if (err.code === '23505') return res.status(400).json({ error: 'El email ya está registrado' });
+    if (err.code === '23505') return res.status(409).json({ error: 'El email ya está registrado' });
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
@@ -79,9 +99,11 @@ app.get('/api/contactos/:id', async (req, res): Promise<any> => {
 // REQ 4: Agregar una nota a un contacto
 app.patch('/api/contactos/:id/notas', async (req, res): Promise<any> => {
   const { id } = req.params;
-  const { nota } = req.body;
+  const { nota } = req.body ?? {};
 
-  if (!nota) return res.status(400).json({ error: 'La nota es obligatoria' });
+  if (typeof nota !== 'string' || nota.trim() === '') {
+    return res.status(400).json({ error: 'La nota es obligatoria y debe ser texto' });
+  }
 
   try {
     const result = await pool.query(
