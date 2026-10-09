@@ -12,3 +12,17 @@ const pool = new Pool({
 });
 
 export default pool;
+// Crea la tabla si no existe. Se llama (y se espera) antes de levantar el servidor.
+export const initSchema = async (): Promise<void> => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS contactos (
+      id SERIAL PRIMARY KEY,
+      nombre VARCHAR(100) NOT NULL,
+      empresa VARCHAR(100),
+      email VARCHAR(100) UNIQUE NOT NULL,
+      telefono VARCHAR(20),
+      notas TEXT,
+      fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+};

@@ -1,6 +1,6 @@
 import express from 'express';
 import * as dotenv from 'dotenv';
-import pool from './db';
+import pool, { initSchema } from './db';
 
 dotenv.config();
 
@@ -8,19 +8,6 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
-
-// Crear la tabla solo si no existe (los datos persisten entre reinicios)
-pool.query(`
-  CREATE TABLE IF NOT EXISTS contactos (
-    id SERIAL PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL,
-    empresa VARCHAR(100),
-    email VARCHAR(100) UNIQUE NOT NULL,
-    telefono VARCHAR(20),
-    notas TEXT,
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  );
-`).then(() => console.log('✅ Tabla contactos lista')).catch(console.error);
 
 // Función auxiliar para validar correos
 const esEmailValido = (email: unknown) =>
@@ -129,4 +116,14 @@ app.delete('/api/contactos/:id', async (req, res): Promise<any> => {
   }
 });
 
-app.listen(port, () => console.log(`🚀 Servidor CRM corriendo en el puerto ${port}`));
+// Primero se prepara la base de datos; solo entonces se acepta tráfico
+const start = async () => {
+  await initSchema();
+  console.log('✅ Tabla contactos lista');
+  app.listen(port, () => console.log(`🚀 Servidor CRM corriendo en el puerto ${port}`));
+};
+
+start().catch((err) => {
+  console.error('❌ No se pudo iniciar la API:', err);
+  process.exit(1);
+});
