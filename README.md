@@ -29,7 +29,7 @@ API REST para gestionar contactos de clientes de un CRM, hecha con Node.js, Expr
    ```bash
    npm run dev
    ```
-   La API queda en `http://localhost:3000`. Otros scripts: `npm start` (sin recarga automática), `npm run typecheck` (verifica tipos) y `npm run build` (compila a `dist/`). Para detener la base de datos: `docker compose down` (agrega `-v` para borrar también los datos).
+   La API queda en `http://localhost:3000`. Otros scripts: `npm start` (sin recarga automática), `npm test` (pruebas), `npm run typecheck` (verifica tipos) y `npm run build` (compila a `dist/`). Para detener la base de datos: `docker compose down` (agrega `-v` para borrar también los datos).
 
 ## Endpoints
 
@@ -87,17 +87,42 @@ curl -X DELETE http://localhost:3000/api/contactos/1
 | 409 | Ya existe un contacto con ese correo | `{"error":"El email ya está registrado"}` |
 | 500 | Error inesperado del servidor | `{"error":"Error interno del servidor"}` |
 
+## Estructura del proyecto
+```
+src/
+  index.ts                 Arranque: inicializa el esquema y levanta el servidor
+  app.ts                   Construye la app Express (sin levantarla, para poder probarla)
+  db.ts                    Conexión a Postgres y creación de la tabla
+  errors.ts                HttpError (error con código HTTP)
+  routes/contactos.ts      URL + método -> controlador
+  controllers/contactos.ts Valida, llama a la capa de datos y responde
+  repositories/contactos.ts  Único lugar con SQL
+  validators/contactos.ts  Reglas de validación
+  middleware/errores.ts    Manejo centralizado de errores y 404
+tests/contactos.test.ts    Pruebas de la API (Vitest + Supertest)
+```
+
+Cada capa tiene una sola responsabilidad: si cambia la base de datos solo se toca `repositories/`, y si cambia una URL solo `routes/`.
+
+## Pruebas
+```bash
+npm test
+```
+Son pruebas de la API con Vitest y Supertest. La capa de datos se simula (mock), así que **no necesitan Postgres** y verifican rutas, validaciones y códigos HTTP (201, 400, 404, 409 y 500).
+
 ## Decisiones de diseño
 - **Las notas viven en una columna `TEXT`** del contacto. Es lo más simple para el alcance de la prueba; con más tiempo usaría una tabla `notas` (con fecha y autor) relacionada por `contacto_id`.
-- **La tabla se crea al arrancar** con `CREATE TABLE IF NOT EXISTS`. Es suficiente aquí; en un proyecto real usaría migraciones.
+- **La tabla se crea al arrancar** con `CREATE TABLE IF NOT EXISTS`, y el servidor solo se levanta cuando termina. Es suficiente aquí; en un proyecto real usaría migraciones.
+- **Errores centralizados:** los controladores lanzan `HttpError` y un único middleware decide la respuesta (Express 5 reenvía los errores de handlers `async`).
 - **Consultas parametrizadas** (`$1`, `$2`) para evitar inyección SQL.
 - **`PATCH` para notas** porque modifica parcialmente un recurso existente.
 
 ## Qué mejoraría con más tiempo
-- Pruebas automatizadas (por ejemplo Vitest + Supertest) con una base de datos de prueba.
+- Pruebas de integración contra una base de datos real (hoy la capa de datos se simula).
 - Paginación en el listado.
-- Migraciones, y separar rutas, controladores y validación en archivos distintos (hoy todo está en `src/index.ts`).
-- Tabla de notas, `PUT` para editar contactos y un manejador de errores centralizado.
+- Tabla `notas` separada (con fecha y autor) en vez de una columna de texto.
+- Migraciones para el esquema en lugar de `CREATE TABLE IF NOT EXISTS`.
+- `PUT` para editar contactos.
 
 ## Uso de IA
 - **Qué usé:** Gemini para generar el esqueleto inicial (configuración, tabla y endpoints) y Claude Code para revisar el repositorio, corregir problemas y redactar parte de este README.
@@ -107,5 +132,6 @@ curl -X DELETE http://localhost:3000/api/contactos/1
   - La validación aceptaba valores que no eran texto; ahora se comprueban tipos y longitudes.
   - Un correo duplicado respondía 400; lo cambié a 409.
   - Un mensaje de commit mencionaba un `PUT` que ya no existe en el código; lo dejé anotado en el PR.
+  - Tras la revisión de Ricardo, separé la API en capas (rutas, controladores, datos, validaciones y middleware de errores), hice que el servidor espere a crear la tabla antes de arrancar y agregué pruebas con Vitest; revisé cada commit y repetí las pruebas manuales con `curl` para confirmar que el comportamiento no cambió.
   - Probé cada endpoint con `curl` contra PostgreSQL en Docker y comprobé los códigos 200, 201, 400, 404 y 409.
 - **Qué entiendo y puedo explicar:** cada ruta de `src/index.ts`, por qué se usan consultas parametrizadas, y la diferencia entre los códigos 400, 404 y 409.
